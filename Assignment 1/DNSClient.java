@@ -98,7 +98,7 @@ public class DNSClient{
 		//create header
 		
 
-
+/*
 		//Set up header
 		ByteBuffer header =ByteBuffer.allocate(12);
 		header = createHeader(header);
@@ -135,5 +135,6 @@ public class DNSClient{
 		}
 
 		return question;
+		*/
 	}
 }
