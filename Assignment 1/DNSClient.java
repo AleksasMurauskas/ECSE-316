@@ -1,6 +1,9 @@
 
 import java.io.*;
 import java.net.*;
+import java.nio.ByteBuffer; 
+
+
 
 public class DNSClient{
 
@@ -118,7 +121,21 @@ public class DNSClient{
 
 			}
 		}
-
+		
+		
 		return question;
+	}
+	
+	public ByteBuffer handleResponse(DatagramPacket responsePacket) {
+		//response work!!! tempory holder should be in main??
+		//byte[] responseData= new byte[1024];
+		//DatagramPacket responsePacket = null; 
+		//responsePacket = new DatagramPacket(responseData, responseData.length);
+		//nvm ignore above stuff just assubme that i have a filled responsePacket
+		byte[] response = responsePacket.getData();
+		
+		
+		
+
 	}
 }
