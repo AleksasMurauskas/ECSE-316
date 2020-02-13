@@ -75,7 +75,7 @@ public class DNSClient{
 			}
 		}
 
-		//calculate the 
+		//calculate the domain length 
 		int domainNameLength=0;
 		String[] tokenizedName =name.split("\\.");//Split the name up into tokens to find length
 		for(int x=0;x< tokenizedName.length; x++){
@@ -83,9 +83,24 @@ public class DNSClient{
 		}
 
 
+		//Set up header
+		ByteBuffer header =ByteBuffer.allocate(12);
+		header = createHeader(header);
+
+
 		//Set up 
 		DatagramPacket sendPacket =null;
 		DatagramPacket recievePacket = null;
 	}
 
+	public ByteBuffer createHeader(ByteBuffer header){
+		byte[] qID = new byte[2]; //Create a randomized 
+		new Random().nextBytes(qID);
+		header.put(qID); //Randomly generated Id number
+		header.put((byte) 0x01); // header line 2 (QR, OPcode, AA, TC, RD, RA, Z, RCODE)
+		header.put((byte) 0x00); // buffer line 2
+		header.put((byte) 0x00); // buffer qd
+		header.put((byte) 0x01); // qd set to 1
+		return header;
+	}
 }
