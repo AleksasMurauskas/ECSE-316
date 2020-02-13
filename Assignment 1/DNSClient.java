@@ -27,7 +27,7 @@ public class DNSClient{
 			else if(args[x].equals("-r")){ //If this appears the next value should hold a maximum number of retries 
 				maxRetries=Integer.parseInt(args[x+1]);
 			}
-			else if(args[x].equals("-r")){
+			else if(args[x].equals("-p")){
 				portVal= Integer.parseInt(args[x+1]);
 			}
 			else if(args[x].equals("-mx")||args[x].equals("-MX")){ //If this appears the Query should be type -MX (Mail Server)
