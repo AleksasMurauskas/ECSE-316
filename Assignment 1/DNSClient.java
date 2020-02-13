@@ -84,6 +84,19 @@ public class DNSClient{
 		for(int x=0;x< tokenizedName.length; x++){
 			domainNameLength+= tokenizedName[x].length()+1;
 		}
+		//testing code 
+		
+		
+		System.out.println("timeout "+timeout);
+		System.out.println("max retries "+maxRetries);
+		System.out.println("port "+portVal);
+		System.out.println("flag "+ qType);
+		System.out.println("server " + server);
+		System.out.println("name "+name);
+		
+		
+		//create header
+		
 
 
 		//Set up header
@@ -98,6 +111,8 @@ public class DNSClient{
 		DatagramPacket sendPacket =null;
 		DatagramPacket recievePacket = null;
 	}
+	
+	
 
 	public ByteBuffer createHeader(ByteBuffer header){
 		byte[] qID = new byte[2]; //Create a randomized 
