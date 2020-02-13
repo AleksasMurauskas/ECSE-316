@@ -1,6 +1,9 @@
 
 import java.io.*;
 import java.net.*;
+import java.util.Random;
+import java.nio.ByteBuffer;
+
 
 public class DNSClient{
 
@@ -96,11 +99,31 @@ public class DNSClient{
 
 
 		ByteBuffer query = ByteBuffer.allocate(12 + domainNameLength + 5);
-
+		query = createQuery(header,question,query);
 
 		//Set up 
 		DatagramPacket sendPacket =null;
 		DatagramPacket recievePacket = null;
+
+		InetAddress foundAddress =InetAddress.getByAddress(ipAddress);//Find net address
+		DatagramSocket clientSocket = new DatagramSocket(); //Create the socket to begin interaction
+
+		byte[] sendData = new byte[1024];
+		byte[] receiveData = new byte[1024];
+		sendData=query.array();
+
+
+
+
+		//Begin attempts to send and recieve packets
+		//Notify User attempts began
+		System.out.println("DNSClient sending request for "+name);
+		System.out.println("Server: " + server);
+		System.out.println("Request Type: " + type.toString());
+
+
+
+
 	}
 
 	public ByteBuffer createHeader(ByteBuffer header){
@@ -139,7 +162,11 @@ public class DNSClient{
 		question.put((byte) 0x0001); 
 		return question;
 	}
-	public ByteBuffer createQuery(ByteBuffer header, ByteBuffer question, ByteBuffer query){
 
+	public ByteBuffer createQuery(ByteBuffer header, ByteBuffer question, ByteBuffer query){
+		//Build the query with the header and question
+		query.put(header.array()); 
+		query.put(question.array());
+		return query;
 	}
 }
