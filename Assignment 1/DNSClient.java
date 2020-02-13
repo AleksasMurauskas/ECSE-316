@@ -27,6 +27,9 @@ public class DNSClient{
 			else if(args[x].equals("-r")){ //If this appears the next value should hold a maximum number of retries 
 				maxRetries=Integer.parseInt(args[x+1]);
 			}
+			else if(args[x].equals("-r")){
+				portVal= Integer.parseInt(args[x+1]);
+			}
 			else if(args[x].equals("-mx")||args[x].equals("-MX")){ //If this appears the Query should be type -MX (Mail Server)
 				qType="MX";
 			}
@@ -87,6 +90,9 @@ public class DNSClient{
 		ByteBuffer header =ByteBuffer.allocate(12);
 		header = createHeader(header);
 
+		//Set up the question
+		ByteBuffer question =ByteBuffer.allocate(12);
+
 
 		//Set up 
 		DatagramPacket sendPacket =null;
@@ -102,5 +108,17 @@ public class DNSClient{
 		header.put((byte) 0x00); // buffer qd
 		header.put((byte) 0x01); // qd set to 1
 		return header;
+	}
+
+	public ByteBuffer createQuestion(ByteBuffer question, String[] tokenizedName){
+		//First we create QName
+		for(int x; x<tokenizedName.length;x++){
+			question.put((byte) tokenizedName[x].length());
+			for(int y=0; y<tokenizedName[i].length;y++){
+
+			}
+		}
+
+		return question;
 	}
 }
