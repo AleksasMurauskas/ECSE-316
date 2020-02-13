@@ -91,7 +91,11 @@ public class DNSClient{
 		header = createHeader(header);
 
 		//Set up the question
-		ByteBuffer question =ByteBuffer.allocate(12);
+		ByteBuffer question =ByteBuffer.allocate(domainNameLength+5);
+		question=createQuestion(question);
+
+
+		ByteBuffer query = ByteBuffer.allocate(12 + domainNameLength + 5);
 
 
 		//Set up 
@@ -110,15 +114,32 @@ public class DNSClient{
 		return header;
 	}
 
-	public ByteBuffer createQuestion(ByteBuffer question, String[] tokenizedName){
+	public ByteBuffer createQuestion(ByteBuffer question, String[] tokenizedName, String type){
 		//First we create QName
 		for(int x; x<tokenizedName.length;x++){
 			question.put((byte) tokenizedName[x].length());
-			for(int y=0; y<tokenizedName[i].length;y++){
-
+			for(int y=0; y<tokenizedName[x].length;y++){
+				question.put((byte) ((int)tokenizedName[x].charAt(y)));
 			}
 		}
+		question.put((byte) 0x00); //Termination bit for QName
+		question.put((byte) 0x00); //Buffer before QType
 
+		//Create QType
+		if(type.equals("A")){ //Record the DNS type
+			question.put((byte) 0x0001);
+		}
+		else if(type.equals("MX")){
+			question.put((byte) 0x000f);
+		}
+		else{
+			question.put((byte) 0x0002);
+		}
+		question.put((byte) 0x0000); //buffer
+		question.put((byte) 0x0001); 
 		return question;
+	}
+	public ByteBuffer createQuery(ByteBuffer header, ByteBuffer question, ByteBuffer query){
+
 	}
 }
