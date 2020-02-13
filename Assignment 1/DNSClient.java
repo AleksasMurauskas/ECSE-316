@@ -11,7 +11,7 @@ public class DNSClient{
 		int timeout = 5; //Optional
 		int maxRetries= 3; //Optional 
 		int portVal =53; //Optional 
-		QueryType qType =QueryType.A; //Baseline unless changed by mx or ns 
+		String qType ="A"; //Baseline unless changed by mx or ns 
 
 		//needed values 
 		String server="";
@@ -28,10 +28,10 @@ public class DNSClient{
 				maxRetries=Integer.parseInt(args[x+1]);
 			}
 			else if(args[x].equals("-mx")||args[x].equals("-MX")){ //If this appears the Query should be type -MX (Mail Server)
-				qType=QueryType.MX;
+				qType="MX";
 			}
 			else if(args[x].equals("-ns")||args[x].equals("-NS")){ //If this appears the Query should be type -MX (Name Server)
-				qType=QueryType.NS;
+				qType="NS";
 			}
 			else if(x=server_pos){//Find Server
 				server=args[x];
