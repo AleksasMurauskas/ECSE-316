@@ -33,11 +33,11 @@ public class DNSClient{
 			else if(args[x].equals("-ns")||args[x].equals("-NS")){ //If this appears the Query should be type -MX (Name Server)
 				qType="NS";
 			}
-			else if(x=server_pos){//Find Server
+			else if(x==server_pos){//Find Server
 				server=args[x];
 			}
-			else if(x=name_pos){//Find name 
-				name_pos=args[x];
+			else if(x==name_pos){//Find name 
+				name=args[x];
 			}
 		}
 		//Parse complete 
@@ -56,8 +56,9 @@ public class DNSClient{
 		}
 
 		for(int x=0; x<strIpAddress.length;x++){
+			int address_part=0;
 			try{
-				int address_part =Integer.parseInt(strIpAddress[x]); //Parse the 
+				address_part =Integer.parseInt(strIpAddress[x]); //Parse the 
 			} catch(Exception e){
 				System.out.println("Input Error: IP Address has incorrect syntax,cannot be parsed as an integer");
 				System.exit(1);
