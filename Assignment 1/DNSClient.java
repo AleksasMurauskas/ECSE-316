@@ -102,8 +102,8 @@ public class DNSClient{
 		query = createQuery(header,question,query);
 
 		//Set up 
-		DatagramPacket sendPacket =null;
-		DatagramPacket recievePacket = null;
+		DatagramPacket outgoingPacket =null;
+		DatagramPacket incomingPacket = null;
 
 		InetAddress foundAddress =InetAddress.getByAddress(ipAddress);//Find net address
 		DatagramSocket clientSocket = new DatagramSocket(); //Create the socket to begin interaction
@@ -119,11 +119,92 @@ public class DNSClient{
 		//Notify User attempts began
 		System.out.println("DNSClient sending request for "+name);
 		System.out.println("Server: " + server);
-		System.out.println("Request Type: " + type.toString());
+		System.out.println("Request Type: " + qtype);
+
+		long startTime=0, endTime=0;
+
+		int attempt;
+
+		for(attempt=0;attempt<maxRetries;attempt++){
+			outgoingPacket= new DatagramPacket(sendData,sendData.length,foundAddress,portVal);
+			clientSocket.send(outgoingPacket);
+			incomingPacket= new DatagramPacket(receiveData, receiveData.length);
+			try{
+				startTime=System.currentTimeMillis();
+				clientSocket.receive(incomingPacket);
+				endTime=System.currentTimeMillis();
+			} catch(Exception e){
+				continue;
+			}
+			if(incomingPacket!=null){
+				break;
+			}
+			if(attempt ==maxRetries){
+				System.out.println("Communication ERROR: Maximum number of retries " + maxRetries + " reached");
+				System.exit(1);
+			}
+		}
+		clientSocket.close();
 
 
+		byte[] dataRecieved = receivePacket.getData();
+		int[] rID = new int[2];
+		rID[0] = dataRecieved[0] & 0xff; //response id first half
+		rID[1] = dataRecieved[1] & 0xff; //response id second half
+		int QR =((dataRecieved[2]>>7)&1)&0xff; //QR bit found
+		int AA =((dataRecieved[2]>>2)&1)&0xff; //AA bit found
+		int TC=((dataRecieved[2]>>1)&1)&0xff;//TC bit found
+		int RD=((dataRecieved[2]>>0)&1)&0xff;//RD bit found
+		int RA =((dataRecieved[3]>>7)&1)&0xff;//RA bit found
+		int RCODE = dataRecieved[3] & 0x0f; //RCODE byte found
+		int QDCOUNT=(short) ((dataRecieved[4] << 8) | (dataRecieved[5] & 0xFF)); // 2 bytes that make up QDCOUNT found
+		int ANCOUNT=(short) ((dataRecieved[6] << 8) | (dataRecieved[7] & 0xFF)); // 2 bytes that make up ANCOUNT found
+		int NSCOUNT=(short) ((dataRecieved[8] << 8) | (dataRecieved[9] & 0xFF)); // 2 bytes that make up ANCOUNT found
+		int NSCOUNT=(short) ((dataRecieved[10] << 8) | (dataRecieved[11] & 0xFF)); // 2 bytes that make up ANCOUNT found
+		//Check header values to see if packet is valid 
+		if (QR != 1) {
+			System.out.println("Packet ERROR: Recieved packet is not a response.");
+			System.exit(1);
+		}
+		if(RA != 1){
+			System.out.println("Packet ERROR: Created Server does not support recursion"); 
+		}
+		boolean auth=false;
+		if (AA == 1) {//Checks if packet is authoratative 
+			auth = true;
+		}
+		String authorization;
+		if(auth){
+			authorization="auth";
+		}
+		else{
+			authorization="nonauth";
+		}
+		//Check for Error Codes
+		//RCODE =0 then there were no errors found
+		if(RCODE==5){
+			System.out.println("Refused: the name server refuses to perform the requested operation for policy reasons");
+			System.exit(1);
+		}
+		else if(RCODE==1){
+			System.out.println("Format ERROR: The name server was unable to interpret the query");
+			System.exit(1);
+		}
+		else if(RCODE==2){
+			System.out.println("Server FAILURE: the name server was unable to process this query due to a problem with the name server");
+			System.exit(1);
+		}
+		else if(RCODE==3){
+			System.out.println("Name ERROR: meaningful only for responses from an authoritative name server, this code signifies that the domain name referenced in the query does not exist");
+			System.exit(1);
+		}
+		else if(RCODE==4){
+			System.out.println("Not Implemented: the name server does not support the requested kind of query");
+			System.exit(1);
+		}
 
-
+		System.out.println("Response packet received after " + ((endTime - startTime) / 1000.0) + " seconds and "+attempt+" retries");
+		
 	}
 
 	public ByteBuffer createHeader(ByteBuffer header){
