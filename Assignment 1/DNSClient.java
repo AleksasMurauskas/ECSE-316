@@ -140,10 +140,14 @@ public class DNSClient{
 			if(incomingPacket!=null){
 				break;
 			}
-			if(attempt ==maxRetries){
-				System.out.println("Communication ERROR: Maximum number of retries " + maxRetries + " reached");
-				System.exit(1);
-			}
+//			if(attempt ==maxRetries-1){
+//				System.out.println("Communication ERROR: Maximum number of retries " + maxRetries + " reached");
+//				System.exit(1);
+//			}
+		}
+		if (attempt>=maxRetries) {
+			System.out.println("Communication ERROR: Maximum number of retries " + maxRetries + " reached");
+			System.exit(1);
 		}
 		clientSocket.close();
 
@@ -165,6 +169,7 @@ public class DNSClient{
 		//Check header values to see if packet is valid 
 		if (QR != 1) {
 			System.out.println("Packet ERROR: Recieved packet is not a response.");
+			System.out.println(dataRecieved[3]);
 			System.exit(1);
 		}
 		if(RA != 1){
@@ -214,7 +219,7 @@ public class DNSClient{
 		}
 		else{
 			for(int x=0;x<ANCOUNT;x++){
-				current_record_size= readRecord(incomingPacket, response_loc,authorization);
+				current_record_size= readRecord(incomingPacket, response_loc,authorization)+12;
 				response_loc+= current_record_size;
 			}
 		}
@@ -230,7 +235,7 @@ public class DNSClient{
 		}
 		else{
 			for(int x=0;x<ARCOUNT;x++){
-				current_record_size = readRecord(incomingPacket,response_loc,authorization);
+				current_record_size = readRecord(incomingPacket,response_loc,authorization)+12;//???????????????
 				response_loc+=current_record_size;
 			}
 		}
@@ -306,6 +311,7 @@ public class DNSClient{
 		short classNum  = (short) ((resp_data[loc+4] << 8) | (resp_data[loc+5] & 0xFF));
 		if(classNum != (short)0x0001){
 			System.out.println("Response ERROR: Class Number DNE 1");
+			//System.out.println(classNum);
 			System.exit(1);
 		}
 
@@ -326,7 +332,7 @@ public class DNSClient{
 			System.out.println("NS\t" + readAlias(pack, loc+ 12, 0) + "\t" + ttl_val + "\t" + auth);
 		}
 		else if(type.equals("CNAME")){
-			System.out.println("NS\t" + readAlias(pack, loc+ 12, 0) + "\t" + ttl_val + "\t" + auth);
+			System.out.println("CNAME\t" + readAlias(pack, loc+ 12, 0) + "\t" + ttl_val + "\t" + auth);
 		}
 		else if(type.equals("MX")){
 			short pref =  (short) ((resp_data[loc+12] << 8) | (resp_data[loc+13] & 0xFF));
