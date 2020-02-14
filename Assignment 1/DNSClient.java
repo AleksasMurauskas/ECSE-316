@@ -216,7 +216,7 @@ public class DNSClient{
 		}
 		for(int x =0;x< NSCOUNT;x++){
 			byte[] resp_data =incomingPacket.getData();
-			int read_len =(int) ((resp_data[loc+10] << 8) | (resp_data[loc+11] & 0xFF));
+			int read_len =(int) ((resp_data[response_loc+10] << 8) | (resp_data[response_loc+11] & 0xFF));
 			current_record_size = read_len+12;
 			response_loc+=current_record_size;
 		}
