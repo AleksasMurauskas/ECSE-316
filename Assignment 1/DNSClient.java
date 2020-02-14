@@ -1,4 +1,3 @@
-
 import java.io.*;
 import java.net.*;
 import java.util.Random;
@@ -95,7 +94,7 @@ public class DNSClient{
 
 		//Set up the question
 		ByteBuffer question =ByteBuffer.allocate(domainNameLength+5);
-		question=createQuestion(question);
+		question=createQuestion(question,tokenizedName,qType);
 
 
 		ByteBuffer query = ByteBuffer.allocate(12 + domainNameLength + 5);
@@ -111,12 +110,15 @@ public class DNSClient{
 		byte[] sendData = new byte[1024];
 		byte[] receiveData = new byte[1024];
 		sendData=query.array();
+		
 
 		//Begin attempts to send and recieve packets
 		//Notify User attempts began
 		System.out.println("DNSClient sending request for "+name);
 		System.out.println("Server: " + server);
-		System.out.println("Request Type: " + qtype);
+
+
+		System.out.println("Request Type: " + qType);
 
 		long startTime=0, endTime=0;
 
@@ -124,8 +126,10 @@ public class DNSClient{
 
 		for(attempt=0;attempt<maxRetries;attempt++){
 			outgoingPacket= new DatagramPacket(sendData,sendData.length,foundAddress,portVal);
-			clientSocket.send(outgoingPacket);
 			incomingPacket= new DatagramPacket(receiveData, receiveData.length);
+			
+			clientSocket.send(outgoingPacket);
+			clientSocket.setSoTimeout(1000*timeout);
 			try{
 				startTime=System.currentTimeMillis();
 				clientSocket.receive(incomingPacket);
@@ -144,7 +148,7 @@ public class DNSClient{
 		clientSocket.close();
 
 
-		byte[] dataRecieved = receivePacket.getData();
+		byte[] dataRecieved = incomingPacket.getData();
 		int[] rID = new int[2];
 		rID[0] = dataRecieved[0] & 0xff; //response id first half
 		rID[1] = dataRecieved[1] & 0xff; //response id second half
@@ -157,7 +161,7 @@ public class DNSClient{
 		int QDCOUNT=(short) ((dataRecieved[4] << 8) | (dataRecieved[5] & 0xFF)); // 2 bytes that make up QDCOUNT found
 		int ANCOUNT=(short) ((dataRecieved[6] << 8) | (dataRecieved[7] & 0xFF)); // 2 bytes that make up ANCOUNT found
 		int NSCOUNT=(short) ((dataRecieved[8] << 8) | (dataRecieved[9] & 0xFF)); // 2 bytes that make up ANCOUNT found
-		int NSCOUNT=(short) ((dataRecieved[10] << 8) | (dataRecieved[11] & 0xFF)); // 2 bytes that make up ANCOUNT found
+		int ARCOUNT=(short) ((dataRecieved[10] << 8) | (dataRecieved[11] & 0xFF)); // 2 bytes that make up ANCOUNT found
 		//Check header values to see if packet is valid 
 		if (QR != 1) {
 			System.out.println("Packet ERROR: Recieved packet is not a response.");
@@ -201,7 +205,7 @@ public class DNSClient{
 		}
 
 		System.out.println("Response packet received after " + ((endTime - startTime) / 1000.0) + " seconds (" + attempt + " retries)");
-		System.out.println("*** Answer Section (" + ANCOUNT + " records) ***")
+		System.out.println("*** Answer Section (" + ANCOUNT + " records) ***");
 
 		int response_loc =outgoingPacket.getLength();
 		int current_record_size=0;
@@ -233,7 +237,7 @@ public class DNSClient{
 
 	}
 
-	public ByteBuffer createHeader(ByteBuffer header){
+	public static ByteBuffer createHeader(ByteBuffer header){
 		byte[] qID = new byte[2]; //Create a randomized 
 		new Random().nextBytes(qID);
 		header.put(qID); //Randomly generated Id number
@@ -244,11 +248,11 @@ public class DNSClient{
 		return header;
 	}
 
-	public ByteBuffer createQuestion(ByteBuffer question, String[] tokenizedName, String type){
+	public static ByteBuffer createQuestion(ByteBuffer question, String[] tokenizedName, String type){
 		//First we create QName
-		for(int x; x<tokenizedName.length;x++){
+		for(int x=0; x<tokenizedName.length;x++){
 			question.put((byte) tokenizedName[x].length());
-			for(int y=0; y<tokenizedName[x].length;y++){
+			for(int y=0; y<tokenizedName[x].length();y++){
 				question.put((byte) ((int)tokenizedName[x].charAt(y)));
 			}
 		}
@@ -270,15 +274,17 @@ public class DNSClient{
 		return question;
 	}
 
-	public ByteBuffer createQuery(ByteBuffer header, ByteBuffer question, ByteBuffer query){
+	public static ByteBuffer createQuery(ByteBuffer header, ByteBuffer question, ByteBuffer query){
 		//Build the query with the header and question
 		query.put(header.array()); 
 		query.put(question.array());
 		return query;
+		
 	}
-	public readRecord(DatagramPacket pack, int loc, String auth){
+	public static int readRecord(DatagramPacket pack, int loc, String auth){
 		byte[] resp_data= pack.getData();
-		short resp_type_data = ((resp_data[loc+2] << 8) | (resp_data[loc+3] & 0xFF));
+		short resp_type_data = (short) ((resp_data[loc+2] << 8) | (resp_data[loc+3] & 0xFF));
+		
 		String type ="A"; 
 		if(resp_type_data==(short) 0x0001 ){ //Read the type of response 
 			//default, do nothing
@@ -294,11 +300,11 @@ public class DNSClient{
 		}
 		else{
 			System.out.println("Response ERROR: Response's Type Unknown.");
-			responseType = "UNKNOWN";
+			type = "UNKNOWN";
 		}
 
-		short classNum  = ((resp_data[loc+4] << 8) | (resp_data[loc+5] & 0xFF));
-		if(classNUm != (short)0x0001){
+		short classNum  = (short) ((resp_data[loc+4] << 8) | (resp_data[loc+5] & 0xFF));
+		if(classNum != (short)0x0001){
 			System.out.println("Response ERROR: Class Number DNE 1");
 			System.exit(1);
 		}
@@ -323,14 +329,14 @@ public class DNSClient{
 			System.out.println("NS\t" + readAlias(pack, loc+ 12, 0) + "\t" + ttl_val + "\t" + auth);
 		}
 		else if(type.equals("MX")){
-			short pref =  ((resp_data[loc+12] << 8) | (resp_data[loc+13] & 0xFF));
+			short pref =  (short) ((resp_data[loc+12] << 8) | (resp_data[loc+13] & 0xFF));
 			System.out.println("MX\t" + readAlias(pack, loc+ 14, 0) + "\t" + ttl_val + "\t" + auth);
 		}
-		short read_len =((resp_data[loc+10] << 8) | (resp_data[loc+11] & 0xFF)); 
+		short read_len =(short) ((resp_data[loc+10] << 8) | (resp_data[loc+11] & 0xFF)); 
 		return read_len;
 	}
 
-	public String readAlias(DatagramPacket pack, int offset, int cnt ){
+	public static String readAlias(DatagramPacket pack, int offset, int cnt ){
 		String name ="";
 		byte[] respCpy =pack.getData();
 		int size=0;
@@ -347,7 +353,7 @@ public class DNSClient{
 				cnt=0;
 			}
 			else{
-				name +=(char) respCpy[offset+cnt]
+				name +=(char) respCpy[offset+cnt];
 				size--;
 			}
 			cnt++;
