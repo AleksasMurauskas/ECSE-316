@@ -1,4 +1,3 @@
-
 import java.io.*;
 import java.net.*;
 import java.util.Random;
@@ -95,7 +94,7 @@ public class DNSClient{
 
 		//Set up the question
 		ByteBuffer question =ByteBuffer.allocate(domainNameLength+5);
-		question=createQuestion(question);
+		question=createQuestion(question,tokenizedName,qType);
 
 
 		ByteBuffer query = ByteBuffer.allocate(12 + domainNameLength + 5);
@@ -111,6 +110,7 @@ public class DNSClient{
 		byte[] sendData = new byte[1024];
 		byte[] receiveData = new byte[1024];
 		sendData=query.array();
+		
 
 
 
@@ -119,14 +119,14 @@ public class DNSClient{
 		//Notify User attempts began
 		System.out.println("DNSClient sending request for "+name);
 		System.out.println("Server: " + server);
-		System.out.println("Request Type: " + type.toString());
+		System.out.println("Request Type: " + qType.toString());
 
 
 
 
 	}
 
-	public ByteBuffer createHeader(ByteBuffer header){
+	public static ByteBuffer createHeader(ByteBuffer header){
 		byte[] qID = new byte[2]; //Create a randomized 
 		new Random().nextBytes(qID);
 		header.put(qID); //Randomly generated Id number
@@ -137,11 +137,11 @@ public class DNSClient{
 		return header;
 	}
 
-	public ByteBuffer createQuestion(ByteBuffer question, String[] tokenizedName, String type){
+	public static ByteBuffer createQuestion(ByteBuffer question, String[] tokenizedName, String type){
 		//First we create QName
-		for(int x; x<tokenizedName.length;x++){
+		for(int x=0; x<tokenizedName.length;x++){
 			question.put((byte) tokenizedName[x].length());
-			for(int y=0; y<tokenizedName[x].length;y++){
+			for(int y=0; y<tokenizedName[x].length();y++){
 				question.put((byte) ((int)tokenizedName[x].charAt(y)));
 			}
 		}
@@ -163,10 +163,11 @@ public class DNSClient{
 		return question;
 	}
 
-	public ByteBuffer createQuery(ByteBuffer header, ByteBuffer question, ByteBuffer query){
+	public static ByteBuffer createQuery(ByteBuffer header, ByteBuffer question, ByteBuffer query){
 		//Build the query with the header and question
 		query.put(header.array()); 
 		query.put(question.array());
 		return query;
+		
 	}
 }
