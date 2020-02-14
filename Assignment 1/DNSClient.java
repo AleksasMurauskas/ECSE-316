@@ -101,8 +101,8 @@ public class DNSClient{
 		query = createQuery(header,question,query);
 
 		//Set up 
-		DatagramPacket sendPacket =null;
-		DatagramPacket recievePacket = null;
+		DatagramPacket outgoingPacket =null;
+		DatagramPacket incomingPacket = null;
 
 		InetAddress foundAddress =InetAddress.getByAddress(ipAddress);//Find net address
 		DatagramSocket clientSocket = new DatagramSocket(); //Create the socket to begin interaction
@@ -112,17 +112,128 @@ public class DNSClient{
 		sendData=query.array();
 		
 
-
-
-
 		//Begin attempts to send and recieve packets
 		//Notify User attempts began
 		System.out.println("DNSClient sending request for "+name);
 		System.out.println("Server: " + server);
-		System.out.println("Request Type: " + qType.toString());
 
 
+		System.out.println("Request Type: " + qType);
 
+		long startTime=0, endTime=0;
+
+		int attempt;
+
+		for(attempt=0;attempt<maxRetries;attempt++){
+			outgoingPacket= new DatagramPacket(sendData,sendData.length,foundAddress,portVal);
+			incomingPacket= new DatagramPacket(receiveData, receiveData.length);
+			
+			clientSocket.send(outgoingPacket);
+			clientSocket.setSoTimeout(1000*timeout);
+			try{
+				startTime=System.currentTimeMillis();
+				clientSocket.receive(incomingPacket);
+				endTime=System.currentTimeMillis();
+			} catch(Exception e){
+				continue;
+			}
+			if(incomingPacket!=null){
+				break;
+			}
+			if(attempt ==maxRetries){
+				System.out.println("Communication ERROR: Maximum number of retries " + maxRetries + " reached");
+				System.exit(1);
+			}
+		}
+		clientSocket.close();
+
+
+		byte[] dataRecieved = incomingPacket.getData();
+		int[] rID = new int[2];
+		rID[0] = dataRecieved[0] & 0xff; //response id first half
+		rID[1] = dataRecieved[1] & 0xff; //response id second half
+		int QR =((dataRecieved[2]>>7)&1)&0xff; //QR bit found
+		int AA =((dataRecieved[2]>>2)&1)&0xff; //AA bit found
+		int TC=((dataRecieved[2]>>1)&1)&0xff;//TC bit found
+		int RD=((dataRecieved[2]>>0)&1)&0xff;//RD bit found
+		int RA =((dataRecieved[3]>>7)&1)&0xff;//RA bit found
+		int RCODE = dataRecieved[3] & 0x0f; //RCODE byte found
+		int QDCOUNT=(short) ((dataRecieved[4] << 8) | (dataRecieved[5] & 0xFF)); // 2 bytes that make up QDCOUNT found
+		int ANCOUNT=(short) ((dataRecieved[6] << 8) | (dataRecieved[7] & 0xFF)); // 2 bytes that make up ANCOUNT found
+		int NSCOUNT=(short) ((dataRecieved[8] << 8) | (dataRecieved[9] & 0xFF)); // 2 bytes that make up ANCOUNT found
+		int ARCOUNT=(short) ((dataRecieved[10] << 8) | (dataRecieved[11] & 0xFF)); // 2 bytes that make up ANCOUNT found
+		//Check header values to see if packet is valid 
+		if (QR != 1) {
+			System.out.println("Packet ERROR: Recieved packet is not a response.");
+			System.exit(1);
+		}
+		if(RA != 1){
+			System.out.println("Packet ERROR: Created Server does not support recursion"); 
+		}
+		boolean auth=false;
+		if (AA == 1) {//Checks if packet is authoratative 
+			auth = true;
+		}
+		String authorization;
+		if(auth){
+			authorization="auth";
+		}
+		else{
+			authorization="nonauth";
+		}
+		//Check for Error Codes
+		//RCODE =0 then there were no errors found
+		if(RCODE==5){
+			System.out.println("Refused: the name server refuses to perform the requested operation for policy reasons");
+			System.exit(1);
+		}
+		else if(RCODE==1){
+			System.out.println("Format ERROR: The name server was unable to interpret the query");
+			System.exit(1);
+		}
+		else if(RCODE==2){
+			System.out.println("Server FAILURE: the name server was unable to process this query due to a problem with the name server");
+			System.exit(1);
+		}
+		else if(RCODE==3){
+			System.out.println("Name ERROR: meaningful only for responses from an authoritative name server, this code signifies that the domain name referenced in the query does not exist");
+			System.exit(1);
+		}
+		else if(RCODE==4){
+			System.out.println("Not Implemented: the name server does not support the requested kind of query");
+			System.exit(1);
+		}
+
+		System.out.println("Response packet received after " + ((endTime - startTime) / 1000.0) + " seconds (" + attempt + " retries)");
+		System.out.println("*** Answer Section (" + ANCOUNT + " records) ***");
+
+		int response_loc =outgoingPacket.getLength();
+		int current_record_size=0;
+		if(ANCOUNT<=0){
+			System.out.println("No Records found");
+		}
+		else{
+			for(int x=0;x<ANCOUNT;x++){
+				current_record_size= readRecord(incomingPacket, response_loc,authorization);
+				response_loc+= current_record_size;
+			}
+		}
+		for(int x =0;x< NSCOUNT;x++){
+			byte[] resp_data =incomingPacket.getData();
+			int read_len =(int) ((resp_data[response_loc+10] << 8) | (resp_data[response_loc+11] & 0xFF));
+			current_record_size = read_len+12;
+			response_loc+=current_record_size;
+		}
+		System.out.println("*** Additional Section (" + ARCOUNT + " records) ***");
+		if(ARCOUNT<=0){
+			System.out.println("NO Additional Records found"); //no additional records found
+		}
+		else{
+			for(int x=0;x<ARCOUNT;x++){
+				current_record_size = readRecord(incomingPacket,response_loc,authorization);
+				response_loc+=current_record_size;
+			}
+		}
 
 	}
 
@@ -169,5 +280,84 @@ public class DNSClient{
 		query.put(question.array());
 		return query;
 		
+	}
+	public static int readRecord(DatagramPacket pack, int loc, String auth){
+		byte[] resp_data= pack.getData();
+		short resp_type_data = (short) ((resp_data[loc+2] << 8) | (resp_data[loc+3] & 0xFF));
+		
+		String type ="A"; 
+		if(resp_type_data==(short) 0x0001 ){ //Read the type of response 
+			//default, do nothing
+		}
+		else if(resp_type_data==(short) 0x0002){
+			type="NS";
+		}
+		else if(resp_type_data==(short) 0x0005){
+			type="CNAME";
+		}
+		else if(resp_type_data==(short) 0x000f){
+			type="MX";
+		}
+		else{
+			System.out.println("Response ERROR: Response's Type Unknown.");
+			type = "UNKNOWN";
+		}
+
+		short classNum  = (short) ((resp_data[loc+4] << 8) | (resp_data[loc+5] & 0xFF));
+		if(classNum != (short)0x0001){
+			System.out.println("Response ERROR: Class Number DNE 1");
+			System.exit(1);
+		}
+
+		//find ttl
+		byte[] ttlData ={ resp_data[loc + 6], resp_data[loc + 7], resp_data[loc + 8],
+				resp_data[loc + 9]};
+		ByteBuffer ttl_block = ByteBuffer.wrap(ttlData);
+		int ttl_val = ttl_block.getInt();
+
+		if(type.equals("A")){
+			int domain1 =resp_data[loc+12]& 0xff;
+			int domain2 =resp_data[loc+13]& 0xff;
+			int domain3 =resp_data[loc+14]& 0xff;
+			int domain4 =resp_data[loc+15]& 0xff;
+			System.out.println("IP\t" + domain1 + "." + domain2 + "." + domain3 + "." + domain4 + "	\t" + ttl_val + "\t" + auth);
+		}
+		else if(type.equals("NS")){
+			System.out.println("NS\t" + readAlias(pack, loc+ 12, 0) + "\t" + ttl_val + "\t" + auth);
+		}
+		else if(type.equals("CNAME")){
+			System.out.println("NS\t" + readAlias(pack, loc+ 12, 0) + "\t" + ttl_val + "\t" + auth);
+		}
+		else if(type.equals("MX")){
+			short pref =  (short) ((resp_data[loc+12] << 8) | (resp_data[loc+13] & 0xFF));
+			System.out.println("MX\t" + readAlias(pack, loc+ 14, 0) + "\t" + ttl_val + "\t" + auth);
+		}
+		short read_len =(short) ((resp_data[loc+10] << 8) | (resp_data[loc+11] & 0xFF)); 
+		return read_len;
+	}
+
+	public static String readAlias(DatagramPacket pack, int offset, int cnt ){
+		String name ="";
+		byte[] respCpy =pack.getData();
+		int size=0;
+		while(respCpy[offset+cnt]!=0){
+			if(size==0){
+				if(cnt!=0){
+					name+=".";
+				}
+			size= respCpy[offset+cnt];
+			}
+			else if((size&0xC0)==0xC0){
+				offset =((size&0x0000003f)<<8)+(respCpy[offset+cnt]& 0xff);
+				size=respCpy[offset];
+				cnt=0;
+			}
+			else{
+				name +=(char) respCpy[offset+cnt];
+				size--;
+			}
+			cnt++;
+		}
+		return name;
 	}
 }
