@@ -112,9 +112,6 @@ public class DNSClient{
 		byte[] receiveData = new byte[1024];
 		sendData=query.array();
 
-
-
-
 		//Begin attempts to send and recieve packets
 		//Notify User attempts began
 		System.out.println("DNSClient sending request for "+name);
@@ -203,8 +200,37 @@ public class DNSClient{
 			System.exit(1);
 		}
 
-		System.out.println("Response packet received after " + ((endTime - startTime) / 1000.0) + " seconds and "+attempt+" retries");
-		
+		System.out.println("Response packet received after " + ((endTime - startTime) / 1000.0) + " seconds (" + attempt + " retries)");
+		System.out.println("*** Answer Section (" + ANCOUNT + " records) ***")
+
+		int response_loc =outgoingPacket.getLength();
+		int current_record_size=0;
+		if(ANCOUNT<=0){
+			System.out.println("No Records found");
+		}
+		else{
+			for(int x=0;x<ANCOUNT;x++){
+				current_record_size= readRecord(incomingPacket, response_loc,authorization);
+				response_loc+= current_record_size;
+			}
+		}
+		for(int x =0;x< NSCOUNT;x++){
+			byte[] resp_data =incomingPacket.getData();
+			int read_len =(int) ((resp_data[loc+10] << 8) | (resp_data[loc+11] & 0xFF));
+			current_record_size = read_len+12;
+			response_loc+=current_record_size;
+		}
+		System.out.println("*** Additional Section (" + ARCOUNT + " records) ***");
+		if(ARCOUNT<=0){
+			System.out.println("NO Additional Records found"); //no additional records found
+		}
+		else{
+			for(int x=0;x<ARCOUNT;x++){
+				current_record_size = readRecord(incomingPacket,response_loc,authorization);
+				response_loc+=current_record_size;
+			}
+		}
+
 	}
 
 	public ByteBuffer createHeader(ByteBuffer header){
@@ -249,5 +275,83 @@ public class DNSClient{
 		query.put(header.array()); 
 		query.put(question.array());
 		return query;
+	}
+	public readRecord(DatagramPacket pack, int loc, String auth){
+		byte[] resp_data= pack.getData();
+		short resp_type_data = ((resp_data[loc+2] << 8) | (resp_data[loc+3] & 0xFF));
+		String type ="A"; 
+		if(resp_type_data==(short) 0x0001 ){ //Read the type of response 
+			//default, do nothing
+		}
+		else if(resp_type_data==(short) 0x0002){
+			type="NS";
+		}
+		else if(resp_type_data==(short) 0x0005){
+			type="CNAME";
+		}
+		else if(resp_type_data==(short) 0x000f){
+			type="MX";
+		}
+		else{
+			System.out.println("Response ERROR: Response's Type Unknown.");
+			responseType = "UNKNOWN";
+		}
+
+		short classNum  = ((resp_data[loc+4] << 8) | (resp_data[loc+5] & 0xFF));
+		if(classNUm != (short)0x0001){
+			System.out.println("Response ERROR: Class Number DNE 1");
+			System.exit(1);
+		}
+
+		//find ttl
+		byte[] ttlData ={ resp_data[loc + 6], resp_data[loc + 7], resp_data[loc + 8],
+				resp_data[loc + 9]};
+		ByteBuffer ttl_block = ByteBuffer.wrap(ttlData);
+		int ttl_val = ttl_block.getInt();
+
+		if(type.equals("A")){
+			int domain1 =resp_data[loc+12]& 0xff;
+			int domain2 =resp_data[loc+13]& 0xff;
+			int domain3 =resp_data[loc+14]& 0xff;
+			int domain4 =resp_data[loc+15]& 0xff;
+			System.out.println("IP\t" + domain1 + "." + domain2 + "." + domain3 + "." + domain4 + "	\t" + ttl_val + "\t" + auth);
+		}
+		else if(type.equals("NS")){
+			System.out.println("NS\t" + readAlias(pack, loc+ 12, 0) + "\t" + ttl_val + "\t" + auth);
+		}
+		else if(type.equals("CNAME")){
+			System.out.println("NS\t" + readAlias(pack, loc+ 12, 0) + "\t" + ttl_val + "\t" + auth);
+		}
+		else if(type.equals("MX")){
+			short pref =  ((resp_data[loc+12] << 8) | (resp_data[loc+13] & 0xFF));
+			System.out.println("MX\t" + readAlias(pack, loc+ 14, 0) + "\t" + ttl_val + "\t" + auth);
+		}
+		short read_len =((resp_data[loc+10] << 8) | (resp_data[loc+11] & 0xFF)); 
+		return read_len;
+	}
+
+	public String readAlias(DatagramPacket pack, int offset, int cnt ){
+		String name ="";
+		byte[] respCpy =pack.getData();
+		int size=0;
+		while(respCpy[offset+cnt]!=0){
+			if(size==0){
+				if(cnt!=0){
+					name+=".";
+				}
+			size= respCpy[offset+cnt];
+			}
+			else if((size&0xC0)==0xC0){
+				offset =((size&0x0000003f)<<8)+(respCpy[offset+cnt]& 0xff);
+				size=respCpy[offset];
+				cnt=0;
+			}
+			else{
+				name +=(char) respCpy[offset+cnt]
+				size--;
+			}
+			cnt++;
+		}
+		return name;
 	}
 }
